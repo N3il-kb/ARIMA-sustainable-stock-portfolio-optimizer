@@ -1,0 +1,48 @@
+tickers:
+  - AAPL
+  - MSFT
+  - NVDA
+  - GOOGL
+  - AMZN
+  - META
+  - BRK-B
+  - LLY
+  - AVGO
+  - JPM
+  - XOM
+  - JNJ
+  - UNH
+  - V
+  - PG
+  - MA
+  - COST
+  - WMT
+  - ORCL
+  - HD
+price:
+  lookback_years: 10
+  interval: "1wk"
+  auto_adjust: true
+esg:
+  source_priority: ["yfinance", "yahoo_html"]
+  normalize: "zscore_to_01"
+arima:
+  use_pmdarima: true
+  max_p: 3
+  max_q: 3
+  max_d: 1
+risk:
+  cov_method: "ewma"
+  ewma_lambda: 0.94
+opt:
+  long_only: true
+  weight_max: 0.15
+  alpha_risk_aversion: 5.0
+  beta_esg_pref: 0.5
+backtest:
+  rebalance: "weekly"
+  train_window_weeks: 156
+plots:
+  engine: "plotly"
+outputs:
+  save_csv: true

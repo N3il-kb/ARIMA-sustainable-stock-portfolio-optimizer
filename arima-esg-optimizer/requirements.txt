@@ -1,0 +1,13 @@
+pandas>=2.2
+numpy>=1.26
+yfinance>=0.2.40
+statsmodels>=0.14
+pmdarima>=2.0.4
+cvxpy>=1.4
+scikit-learn>=1.5
+plotly>=5.24
+pyyaml>=6.0
+tqdm>=4.66
+requests>=2.32
+beautifulsoup4>=4.12
+pytest>=8.0
