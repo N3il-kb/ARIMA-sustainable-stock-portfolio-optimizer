@@ -1,12 +1,29 @@
-import yfinance as yf
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Iterable, Sequence
+
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
 
+try:
+    import yfinance as yf  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    yf = None
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+ESG_FALLBACK_PATH = DATA_DIR / "esg_scores.csv"
+
 def get_esg_from_yfinance(ticker):
     """Fetches ESG score from yfinance .sustainability attribute."""
+    if yf is None:
+        return None
+
     try:
         t = yf.Ticker(ticker)
         sustainability = t.sustainability
@@ -33,7 +50,17 @@ def get_esg_from_html(ticker):
         return None
     return None
 
-def collect_esg_scores(tickers, source_priority):
+@lru_cache()
+def _fallback_esg_scores() -> pd.Series:
+    if ESG_FALLBACK_PATH.exists():
+        df = pd.read_csv(ESG_FALLBACK_PATH)
+        if {'ticker', 'esg_score'}.issubset(df.columns):
+            series = df.set_index('ticker')['esg_score'].astype(float)
+            return series
+    return pd.Series(dtype=float)
+
+
+def collect_esg_scores(tickers: Sequence[str], source_priority: Iterable[str]):
     """
     Collects ESG scores for a list of tickers using the specified source priority.
     """
@@ -50,9 +77,14 @@ def collect_esg_scores(tickers, source_priority):
             if score is not None:
                 break  # Found a score, move to the next ticker
 
+        if score is None:
+            fallback = _fallback_esg_scores()
+            if ticker in fallback.index:
+                score = float(fallback.loc[ticker])
+
         esg_scores[ticker] = score
 
-    return pd.Series(esg_scores, name="esg_score")
+    return pd.Series(esg_scores, name="esg_score", dtype=float)
 
 def normalize_esg(esg_scores, method="zscore_to_01"):
     """

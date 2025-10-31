@@ -6,12 +6,26 @@ def compute_covariance_matrix(returns, method, ewma_lambda):
     """
     Computes the covariance matrix of returns.
     """
+    if returns.shape[0] < 2:
+        # Not enough history; fallback to diagonal matrix
+        return pd.DataFrame(
+            np.eye(returns.shape[1]),
+            index=returns.columns,
+            columns=returns.columns
+        )
+
     if method == "ewma":
         # The correct formula for span from the decay factor lambda is: span = 2 / (1 - lambda) - 1
         span = 2 / (1 - ewma_lambda) - 1
-        return returns.ewm(span=span).cov()
-    else: # Default to sample covariance
-        return returns.cov()
+        cov_panel = returns.ewm(span=span, adjust=False).cov(pairwise=True)
+        cov_matrix = cov_panel.loc[returns.index[-1]]
+    else:  # Default to sample covariance
+        cov_matrix = returns.cov()
+
+    cov_matrix = cov_matrix.fillna(0.0)
+    # Ensure symmetry
+    cov_matrix = (cov_matrix + cov_matrix.T) / 2
+    return cov_matrix
 
 def optimize_portfolio(r_hat, Sigma, esg_norm, cfg):
     """
@@ -26,7 +40,13 @@ def optimize_portfolio(r_hat, Sigma, esg_norm, cfg):
     beta = cfg["opt"]["beta_esg_pref"]
     cap = cfg["opt"]["weight_max"]
 
-    objective = cp.Maximize(w @ r_hat - alpha * cp.quad_form(w, Sigma) + beta * (w @ esg_norm))
+    Sigma_matrix = np.asarray(Sigma, dtype=float)
+    if Sigma_matrix.ndim != 2 or Sigma_matrix.shape[0] != Sigma_matrix.shape[1]:
+        raise ValueError("Covariance matrix must be square.")
+    # Add a small ridge term to improve numerical stability
+    Sigma_psd = Sigma_matrix + np.eye(n) * 1e-6
+
+    objective = cp.Maximize(w @ r_hat - alpha * cp.quad_form(w, Sigma_psd) + beta * (w @ esg_norm))
 
     constraints = [
         w >= 0,           # Long-only constraint
@@ -35,7 +55,10 @@ def optimize_portfolio(r_hat, Sigma, esg_norm, cfg):
     ]
 
     prob = cp.Problem(objective, constraints)
-    prob.solve(solver=cp.OSQP, verbose=False)
+    try:
+        prob.solve(solver=cp.OSQP, verbose=False)
+    except cp.SolverError:
+        prob.solve(solver=cp.SCS, verbose=False)
 
     if prob.status != 'optimal':
         # Fallback to a simple equal-weight portfolio if optimization fails

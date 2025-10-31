@@ -1,7 +1,10 @@
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import pandas as pd
+from __future__ import annotations
+
+from pathlib import Path
+
 import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 
 def plot_cumulative_returns(backtest_results, cfg):
     """Plots the cumulative returns of the portfolio."""
@@ -83,21 +86,28 @@ def plot_all(backtest_results, esg, cfg, returns_df):
     """
     Generates and saves all plots.
     """
+    project_root = Path(__file__).resolve().parent.parent
+    figures_dir = project_root / "outputs" / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
     if cfg['plots']['engine'] == 'plotly':
         # Cumulative returns plot
         fig_cum_returns = plot_cumulative_returns(backtest_results, cfg)
-        fig_cum_returns.show()
-        fig_cum_returns.write_html("outputs/figures/cumulative_returns.html")
+        if cfg['plots'].get('show', False):
+            fig_cum_returns.show()
+        fig_cum_returns.write_html(figures_dir / "cumulative_returns.html")
 
         # Weights heatmap
         fig_weights = plot_weights_heatmap(backtest_results, cfg)
-        fig_weights.show()
-        fig_weights.write_html("outputs/figures/weights_heatmap.html")
+        if cfg['plots'].get('show', False):
+            fig_weights.show()
+        fig_weights.write_html(figures_dir / "weights_heatmap.html")
 
         # Risk-Return-ESG Frontier
         fig_frontier = plot_risk_return_esg_frontier(returns_df, esg, cfg)
-        fig_frontier.show()
-        fig_frontier.write_html("outputs/figures/risk_return_esg_frontier.html")
+        if cfg['plots'].get('show', False):
+            fig_frontier.show()
+        fig_frontier.write_html(figures_dir / "risk_return_esg_frontier.html")
 
         print("All plots generated and saved to outputs/figures/.")
 
